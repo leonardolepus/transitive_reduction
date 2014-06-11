@@ -1,3 +1,11 @@
+#current problems:
+#how to estimate parameters weights, num_edges
+#how to sample seeds instead of traversing over the entire space
+import time
+
+from numpy import *
+
+
 class seed_generator(object):
 
     def __init__(self, n):
@@ -16,7 +24,6 @@ class seed_generator(object):
                     seed[i][j] = s%2
                     seed[j][i] = s%2
                     s = s/2
-        print self.index
         self.index = self.index + 1
         return seed
 
@@ -34,13 +41,13 @@ def induction(s, weights, funcs):
         p += w*f(s)
     for i in arange(p.shape[0]):
         p[i][i] = 0
-    p = 2.0*p/sum(p)
+    p = 2.0*p/(sum(p) or 1.0)
     return p
 
 
 def bayesian(m, weights, funcs):
     #calculates how likely each edge in m is likely to be in the transitive reduction of m
-    edge_num = m.sum()/2
+    edge_num = m.sum()/2*2
     n = m.shape[0]
     seeds = seed_generator(n)
 
@@ -67,28 +74,34 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     g = nx.Graph()
-    g.add_edges_from([[1, 2], [1, 3], [2, 4], [3, 4], [1, 4], [1, 5], [5, 6], [6, 7]])
+    g.add_edges_from([[1, 2], [1, 3], [1, 4], [1, 5], [2, 3], [2, 4], [2, 5]])
     nx.draw(g)
     plt.show()
 
     m = nx.adjacency_matrix(g)
     m = array(m)
-    print m
+    #print m
 
     def func1(m):
-        return ones(m.shape)
+        a = ones(m.shape)
+        for i in arange(a.shape[0]):
+            a[i][i] = 0
+        a = 2.0*a/(sum(a) or 1.0)
+        return a
 
     def func2(m):
-        return m
+        return 2.0*m/(sum(m) or 1.0)
 
     def func3(m):
         a = dot(m, m)
         for i in arange(a.shape[0]):
             a[i][i] = 0
-        return a
+        return 2.0*a/(sum(a) or 1.0)
 
     funcs = [func1, func2, func3]
-    weights = [0.1, 0.8, 0.5]
+    weights = [0.1, 1.0, 0.5]
 
+    t = time.time()
     baye = bayesian(m, weights, funcs)
+    print time.time()-t
     print baye
