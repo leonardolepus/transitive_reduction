@@ -79,7 +79,7 @@ if __name__ == '__main__':
     plt.show()
 
     m = nx.adjacency_matrix(g)
-    m = array(m)
+    m = m.toarray()
     #print m
 
     def func1(m):
