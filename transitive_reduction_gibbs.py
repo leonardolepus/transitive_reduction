@@ -23,28 +23,47 @@ def adj2vector(g):
     return g[sel]
                       
     
-def differential(func, theta, min_slope=1.0e-8):
+def induction(theta, g, funcs, weights, path_num):
+    #likelyhood = L(theta|g) = p(g|theta) = the possibility of getting a particular g given parameters theta
+    #funcs is a list of ways to make inductions
+    #weights is weights for each way of inductions
+    p = zeros(g.shape)
+    seed = vector2adj(theta, g)
+    weights = array(weights, float)
+    weights = weights/sum(weights)
+    for f, w in zip(funcs, weights):
+        p += w*f(seed)
+    diag = eye(p.shape[0])>0
+    p[diag] = 0
+    absent_prob = ((p*(-1.0)+1.0)**path_num)
+    present_sel = logical_and(g, tril(ones(g.shape), -1))
+    present_prob_g = absent_prob[present_sel]*(-1.0)+1.0
+    absent_sel = logical_and(logical_not(g), tril(ones(g.shape), -1))
+    absent_prob_g = absent_prob[absent_sel]
+    prob_g = prod(present_prob_g)*prod(absent_prob_g)
+    assert prob_g
+    return prob_g
+
+
+def differential(func, theta):
     #calculates product of differentials of func over theta in all dimensions
     value = func(theta)
+    #print value
     dif = 1.0
     for i in range(0, len(theta)):
         new_theta = toggle(theta, i)
         d_theta = new_theta[i] - theta[i]
         d_value = func(new_theta)-value
         slope = d_value/d_theta
-        print slope
-        if not slope:
-            slope = min_slope
-        elif slope < min_slope:
-            min_slope = slope
+        #print slope
+        assert slope
         dif = dif*slope
-        assert dif
-    return abs(dif)
+    return abs(dif)**(1.0/len(theta))   #I can't really explain why root of dif is used. it's the average diff in one dimension. i thought the product of diffs in all dimension should be correlated with my notion of weight. but in that case the sampler moves in a narrow space because in certain dimensions one value is so much higher prefered than the other.
 
         
 class gibbs_sampler(object):
 
-    def __init__(self, theta_0, dist, ignore = 100, total = 100):
+    def __init__(self, theta_0, dist, ignore = 100, total = 1000):
         self.theta = theta_0   #initial theta
         self.dist = dist   #desired distribution function, dist(theta) is proportional to the desired possibility of picking theta
         self.prob = self.dist(self.theta)   #possibility of sampling theta, inverse of its weight
@@ -56,7 +75,7 @@ class gibbs_sampler(object):
     def next(self):
         if self.count >= self.total:
             raise StopIteration
-        for j in range(0, 50):
+        for j in range(0, 10):
             for i in range(0, len(self.theta)):
                 new_theta = toggle(self.theta, i)
                 new_prob = self.dist(new_theta)
@@ -66,43 +85,30 @@ class gibbs_sampler(object):
                     self.prob = new_prob
         weight = 1.0/self.prob
         self.count += 1
-        print self.theta
+        print self.theta, weight
         return (self.theta, weight)
 
     def __iter__(self):
         return self
 
 
-def induction(theta, g, funcs, weights, path_num):
-    #likelyhood = L(theta|g) = p(g|theta) = the possibility of getting a particular g given parameters theta
-    #funcs is a list of ways to make inductions
-    #weights is weights for each way of inductions
-    p = zeros(g.shape)
-    seed = vector2adj(theta, g)
-    for f, w in zip(funcs, weights):
-        p += w*f(seed)
-    diag = eye(p.shape[0])>0
-    p[diag] = 0
-    p = 2.0*p/sum(p) if sum(p) else p
-    absent_prob = ((p*(-1.0)+1.0)**path_num)
-    present_sel = logical_and(g, tril(ones(g.shape), 0))
-    present_prob_g = absent_prob[present_sel]*(-1.0)+1.0
-    absent_sel = logical_and(logical_not(g), tril(ones(g.shape), 0))
-    absent_prob_g = absent_prob[absent_sel]
-    prob_g = prod(present_prob_g)*prod(absent_prob_g)
-    assert prob_g
-    return prob_g
-
-
 def bayesian(sampler, likelyhood_func, prior_func):
+    theta_sum = zeros(sampler.theta.shape)
+    total = 0
+    weighted_total = 0
     posterior = zeros(sampler.theta.shape)
     p_total = 0
     for theta, weight in sampler:
         l = likelyhood_func(theta)*weight
         prior = prior_func(theta)
         p = l*prior
+        theta_sum += theta
+        total += 1
+        weighted_total += theta*weight
         posterior += theta*p
         p_total += p
+    print theta_sum/total
+    print weighted_total/total
     return posterior/p_total
     
 
@@ -137,7 +143,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     g = nx.Graph()
-    g.add_edges_from([[1, 2], [1, 3], [2, 4], [3, 4], [1, 4], [1, 5], [5, 6]])
+    g.add_edges_from([[1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [2, 3], [4, 5], [5, 6]])
     nx.draw(g)
     plt.show()
 
@@ -146,24 +152,26 @@ if __name__ == '__main__':
     print adj
 
     def func1(m):
-        return ones(m.shape)
+        p = ones(m.shape)
+        p = 2.0*p/sum(p) if sum(p) else p
+        return p
 
     def func2(m):
-        return m
+        return 2.0*m/sum(m) if sum(m) else m
 
     def func3(m):
         a = dot(m, m)
-        for i in arange(a.shape[0]):
-            a[i][i] = 0
-        return a
+        a[eye(a.shape[0])>0] = 0
+        return 2.0*a/sum(a) if sum(a) else a
 
     induc_funcs = [func1, func2, func3]
-    induc_weights = [0.1, 0.8, 0.5]
+    induc_weights = [0.1, 0.8, 0.8]
 
     likelyhood_func = lambda theta: induction(theta, adj, induc_funcs, induc_weights, g.number_of_edges())
     prior_func = lambda theta: 1
     sample_dist = lambda theta: differential(likelyhood_func, theta)
     theta = adj2vector(adj)
+    theta = array(random.rand(len(theta))>0.8, float)
     sampler = gibbs_sampler(theta, sample_dist)
 
     posterior = bayesian(sampler, likelyhood_func, prior_func)
