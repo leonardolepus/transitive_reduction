@@ -60,7 +60,7 @@ def bayesian(m, weights, funcs):
         p_m = 1.0
         for i in arange(n):
             for j in arange(i+1, n):
-                if m[i][j]:
+                if m[(i, j)]:
                     p_m *= p_present[i][j]
                 else:
                     p_m *= p_absent[i][j]
@@ -79,7 +79,6 @@ if __name__ == '__main__':
     plt.show()
 
     m = nx.adjacency_matrix(g)
-    m = array(m)
     #print m
 
     def func1(m):
@@ -103,5 +102,5 @@ if __name__ == '__main__':
 
     t = time.time()
     baye = bayesian(m, weights, funcs)
-    print time.time()-t
+    print time.time()-t, 'seconds used'
     print baye
