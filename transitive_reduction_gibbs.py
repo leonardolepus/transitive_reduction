@@ -11,15 +11,15 @@ def toggle(theta, i):
 
 
 def vector2adj(theta, g):
-    sel = logical_and(g>0, tril(ones(g.shape), 0))
+    sel = logical_and(g>0, triu(ones(g.shape), 1))
     adj = zeros(g.shape)
     adj[sel] = theta
-    adj[transpose(sel)] = theta
+    adj[transpose(sel)] = transpose(adj)[transpose(sel)]
     return adj
 
 
 def adj2vector(g):
-    sel = logical_and(g>0, tril(ones(g.shape), 0))
+    sel = logical_and(g>0, triu(ones(g.shape), 1))
     return g[sel]
                       
     
@@ -71,6 +71,7 @@ class gibbs_sampler(object):
         self.count = 0
         for i in range(0, ignore):
             self.next()
+        print 'gibbs_sampler initiated'
 
     def next(self):
         if self.count >= self.total:
@@ -83,7 +84,7 @@ class gibbs_sampler(object):
                 if random.random()<cond_p:
                     self.theta = new_theta
                     self.prob = new_prob
-        weight = 1.0/self.prob
+        weight = 1.0
         self.count += 1
         print self.theta, weight
         return (self.theta, weight)
@@ -148,6 +149,7 @@ if __name__ == '__main__':
     plt.show()
 
     adj = nx.adjacency_matrix(g)
+    adj = adj.toarray()
     adj = array(adj, float)
     print adj
 
@@ -169,9 +171,10 @@ if __name__ == '__main__':
 
     likelyhood_func = lambda theta: induction(theta, adj, induc_funcs, induc_weights, g.number_of_edges())
     prior_func = lambda theta: 1
-    sample_dist = lambda theta: differential(likelyhood_func, theta)
+    #sample_dist = lambda theta: differential(likelyhood_func, theta)
+    sample_dist = likelyhood_func
     theta = adj2vector(adj)
-    theta = array(random.rand(len(theta))>0.8, float)
+    theta = array(random.rand(len(theta))>0.2, float)
     sampler = gibbs_sampler(theta, sample_dist)
 
     posterior = bayesian(sampler, likelyhood_func, prior_func)
