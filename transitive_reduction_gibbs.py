@@ -63,7 +63,7 @@ def differential(func, theta):
         
 class gibbs_sampler(object):
 
-    def __init__(self, theta_0, dist, ignore = 100, total = 100):
+    def __init__(self, theta_0, dist, ignore = 100, total = 10000):
         self.theta = theta_0   #initial theta
         self.dist = dist   #desired distribution function, dist(theta) is proportional to the desired possibility of picking theta
         self.prob = self.dist(self.theta)   #possibility of sampling theta, inverse of its weight
@@ -71,6 +71,7 @@ class gibbs_sampler(object):
         self.count = 0
         for i in range(0, ignore):
             self.next()
+        print 'gibbs_sampler initiated'
 
     def next(self):
         if self.count >= self.total:
@@ -83,7 +84,7 @@ class gibbs_sampler(object):
                 if random.random()<cond_p:
                     self.theta = new_theta
                     self.prob = new_prob
-        weight = 1.0/self.prob
+        weight = 1.0
         self.count += 1
         print self.theta, weight
         return (self.theta, weight)
@@ -170,9 +171,10 @@ if __name__ == '__main__':
 
     likelyhood_func = lambda theta: induction(theta, adj, induc_funcs, induc_weights, g.number_of_edges())
     prior_func = lambda theta: 1
-    sample_dist = lambda theta: differential(likelyhood_func, theta)
+    #sample_dist = lambda theta: differential(likelyhood_func, theta)
+    sample_dist = likelyhood_func
     theta = adj2vector(adj)
-    theta = array(random.rand(len(theta))>0.8, float)
+    theta = array(random.rand(len(theta))>0.2, float)
     sampler = gibbs_sampler(theta, sample_dist)
 
     posterior = bayesian(sampler, likelyhood_func, prior_func)
